@@ -1,0 +1,57 @@
+{
+  "name": "bluntjira",
+  "version": "0.1.0",
+  "description": "Jira REST API v2 MCP server over stdio",
+  "type": "module",
+  "license": "MIT",
+  "author": "Danil Shagimardanov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danillittle/bluntjira.git"
+  },
+  "homepage": "https://github.com/danillittle/bluntjira#readme",
+  "bugs": {
+    "url": "https://github.com/danillittle/bluntjira/issues"
+  },
+  "keywords": ["jira", "mcp", "model-context-protocol", "stdio"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "bluntjira": "dist/index.js"
+  },
+  "files": [
+    "dist/cookie.js",
+    "dist/index.js",
+    "dist/jira-client.js",
+    "dist/login.js",
+    "dist/settings.js",
+    "dist/tools.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "oxlint --max-warnings=0 src tests",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
+    "start": "node dist/index.js",
+    "dev": "npm run build && node dist/index.js",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run check",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "oxlint": "1.88.0",
+    "typescript": "7.0.2"
+  }
+}

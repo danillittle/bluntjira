@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.test-dist/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.tgz
+coverage/
+.DS_Store
+npm-debug.log*
+*.log
+.npmrc
+.bluntjira/

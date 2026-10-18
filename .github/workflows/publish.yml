@@ -1,0 +1,110 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require a release from the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+          assert.match(process.env.RELEASE_TAG, /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/,
+            "Release tags must use vX.Y.Z (stable releases only)");
+          assert.equal(process.env.RELEASE_TAG, `v${pkg.version}`, "Tag must match package.json");
+          assert.equal(lock.version, pkg.version, "Lockfile version must match package.json");
+          assert.equal(lock.packages[""].version, pkg.version, "Lockfile root version must match package.json");
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, type check, test and build
+        run: npm run check
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - name: Pack and dry-run the release archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          npm pack --pack-destination "$RUNNER_TEMP/release"
+          mv "$RUNNER_TEMP"/release/bluntjira-*.tgz "$RUNNER_TEMP/release/package.tgz"
+          npm publish "$RUNNER_TEMP/release/package.tgz" --dry-run --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
+
+      - name: Upload verified archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/release/package.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Set up Node.js for trusted publishing
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+
+      - name: Check npm supports trusted publishing
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          const [major, minor, patch] = execFileSync("npm", ["--version"], { encoding: "utf8" }).trim().split(".").map(Number);
+          assert.ok(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))),
+            "Trusted publishing requires npm >=11.5.1");
+          NODE
+
+      - name: Download verified archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: npm-package
+          path: release
+
+      - name: Publish verified archive with OIDC
+        run: npm publish ./release/package.tgz --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
