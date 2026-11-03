@@ -19,6 +19,11 @@ export async function createMockJira(hang = false) {
     const seen = Promise.withResolvers<void>();
     const disconnected = Promise.withResolvers<void>();
     const server = createServer({ key: await readFile(key), cert: await readFile(certificate) }, (request, response) => {
+      if (request.url === "/jira/rest/auth/1/session") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ session: { name: "JSESSIONID", value: "mock-session" } }));
+        return;
+      }
       requests.push({ path: request.url, authorization: request.headers.authorization, cookie: request.headers.cookie });
       response.once("close", () => disconnected.resolve());
       seen.resolve();

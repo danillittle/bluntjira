@@ -7,8 +7,8 @@ export class SettingsError extends Error {}
 
 export interface StoredSettings {
   JIRA_URL?: string;
-  JIRA_COOKIE_NAME?: string;
-  JIRA_COOKIE_VALUE?: string;
+  JIRA_USERNAME?: string;
+  JIRA_PASSWORD?: string;
 }
 
 export function settingsPath(): string {
@@ -37,7 +37,7 @@ export async function readSettings(filePath = settingsPath()): Promise<StoredSet
   const settings = parsed as Record<string, unknown>;
   return {
     ...(typeof settings.JIRA_URL === "string" ? { JIRA_URL: settings.JIRA_URL } : {}),
-    ...(typeof settings.JIRA_COOKIE_NAME === "string" ? { JIRA_COOKIE_NAME: settings.JIRA_COOKIE_NAME } : {}),
-    ...(typeof settings.JIRA_COOKIE_VALUE === "string" ? { JIRA_COOKIE_VALUE: settings.JIRA_COOKIE_VALUE } : {}),
+    ...(typeof settings.JIRA_USERNAME === "string" ? { JIRA_USERNAME: settings.JIRA_USERNAME } : {}),
+    ...(typeof settings.JIRA_PASSWORD === "string" ? { JIRA_PASSWORD: settings.JIRA_PASSWORD } : {}),
   };
 }

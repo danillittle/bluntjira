@@ -45,7 +45,7 @@ test("packed npm archive contains only runtime files and its installed bin serve
 
   const jira = await createMockJira();
   t.after(jira.close);
-  const home = await createSettingsHome(t, { JIRA_URL: jira.url, JIRA_COOKIE_NAME: "JSESSIONID", JIRA_COOKIE_VALUE: "package-test-session" });
+  const home = await createSettingsHome(t, { JIRA_URL: jira.url, JIRA_USERNAME: "alice", JIRA_PASSWORD: "package-test-password" });
   const transport = new StdioClientTransport({
     command: join(directory, "node_modules/.bin/bluntjira"), args: [], cwd: directory, stderr: "pipe",
     env: { NODE_EXTRA_CA_CERTS: jira.certificate, HOME: home, USERPROFILE: home },
@@ -62,6 +62,6 @@ test("packed npm archive contains only runtime files and its installed bin serve
   assert.deepEqual(result.content, [{ type: "text", text: JSON.stringify([{ key: "TEST", name: "Mock Jira" }]) }]);
   assert.equal(jira.requests.length, 1);
   assert.equal(jira.requests[0]?.path, "/jira/rest/api/2/project");
-  assert.equal(jira.requests[0]?.cookie, "JSESSIONID=package-test-session");
+  assert.equal(jira.requests[0]?.cookie, "JSESSIONID=mock-session");
   assert.equal(stderr, "");
 });

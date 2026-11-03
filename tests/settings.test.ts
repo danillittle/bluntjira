@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { readSettings } from "../src/settings.js";
 
-const settings = { JIRA_URL: "https://jira.example.com", JIRA_COOKIE_NAME: "JSESSIONID", JIRA_COOKIE_VALUE: "session-value" };
+const settings = { JIRA_URL: "https://jira.example.com", JIRA_USERNAME: "alice", JIRA_PASSWORD: "secret-password" };
 
 test("reads JSON settings and ignores unrelated fields", async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(), "bluntjira-settings-"));

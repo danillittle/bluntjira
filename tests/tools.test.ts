@@ -10,7 +10,7 @@ const config = { url: "https://jira.example.com/jira", cookieName: "JSESSIONID",
 
 async function connect(fetchImpl: typeof fetch) {
   const jira = new JiraClient(config, { fetch: fetchImpl });
-  const server = new McpServer({ name: "bluntjira", version: "0.1.0" });
+  const server = new McpServer({ name: "bluntjira", version: "0.2.0" });
   registerTools(server, jira);
   const client = new Client({ name: "test-client", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

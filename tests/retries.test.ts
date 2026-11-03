@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { JiraClient, JiraRequestError } from "../src/jira-client.js";
+import { LoginError } from "../src/login.js";
 
 const config = { url: "https://jira.example.com", cookieName: "JSESSIONID", cookieValue: "test-session-token" };
 function clock() {
@@ -232,4 +233,81 @@ test("another request's auth failure prevents a pending retry", async () => {
   resume.resolve();
   await assert.rejects(read, /paused/);
   assert.equal(calls, 2);
+});
+
+test("a 401 triggers one automatic re-login and the request is retried with the new cookie", async () => {
+  const cookies: (string | null)[] = [];
+  let reauths = 0;
+  const client = new JiraClient(config, {
+    fetch: async (_input, init) => {
+      const cookie = new Headers(init?.headers).get("Cookie");
+      cookies.push(cookie);
+      return cookie === "JSESSIONID=fresh" ? Response.json([]) : new Response("{}", { status: 401 });
+    },
+    reauth: async () => { reauths++; return { cookieName: "JSESSIONID", cookieValue: "fresh" }; },
+  });
+  assert.deepEqual(await client.getProjects(), []);
+  assert.equal(reauths, 1);
+  assert.deepEqual(cookies, [`${config.cookieName}=${config.cookieValue}`, "JSESSIONID=fresh"]);
+});
+
+test("the first request logs in lazily, without a configured cookie", async () => {
+  let logins = 0;
+  const cookies: (string | null)[] = [];
+  const client = new JiraClient({ url: config.url }, {
+    fetch: async (_input, init) => { cookies.push(new Headers(init?.headers).get("Cookie")); return Response.json([]); },
+    reauth: async () => { logins++; return { cookieName: "JSESSIONID", cookieValue: "lazy" }; },
+  });
+  await client.getProjects();
+  await client.getProjects();
+  assert.equal(logins, 1);
+  assert.deepEqual(cookies, ["JSESSIONID=lazy", "JSESSIONID=lazy"]);
+});
+
+test("concurrent expired requests share one login", async () => {
+  let logins = 0;
+  const client = new JiraClient(config, {
+    fetch: async (_input, init) => new Headers(init?.headers).get("Cookie") === "JSESSIONID=fresh"
+      ? Response.json([]) : new Response("{}", { status: 401 }),
+    reauth: async () => { logins++; await delay(5); return { cookieName: "JSESSIONID", cookieValue: "fresh" }; },
+  });
+  await Promise.all([client.getProjects(), client.getProjects(), client.getProjects()]);
+  assert.equal(logins, 1);
+});
+
+test("a persistent 401 after re-login is not retried again", async () => {
+  let calls = 0;
+  let logins = 0;
+  const client = new JiraClient(config, {
+    fetch: async () => { calls++; return new Response("{}", { status: 401 }); },
+    reauth: async () => { logins++; return { cookieName: "JSESSIONID", cookieValue: "fresh" }; },
+  });
+  await assert.rejects(client.getProjects(), (error: unknown) => error instanceof JiraRequestError && error.status === 401);
+  assert.equal(calls, 2);
+  assert.equal(logins, 1);
+});
+
+test("rejected credentials stop further login attempts, transient failures do not", async () => {
+  let logins = 0;
+  let rejected = false;
+  const client = new JiraClient(config, {
+    fetch: async () => new Response("{}", { status: 401 }),
+    reauth: async () => { logins++; throw new LoginError("Jira login failed (HTTP 401)", rejected); },
+  });
+  await assert.rejects(client.getProjects(), /Jira login failed/);
+  await assert.rejects(client.getProjects(), /Jira login failed/);
+  assert.equal(logins, 2, "transient failures are retried by the next request");
+  rejected = true;
+  await assert.rejects(client.getProjects(), /Jira login failed/);
+  await assert.rejects(client.getProjects(), (error: unknown) => error instanceof JiraRequestError && error.status === 401);
+  assert.equal(logins, 3, "no login attempt after Jira rejected the credentials");
+});
+
+test("a failed login on a write is not reported as an unknown write outcome", async () => {
+  const client = new JiraClient({ url: config.url }, {
+    fetch: async () => { throw new Error("must not be called"); },
+    reauth: async () => { throw new LoginError("Unable to reach Jira for login"); },
+  });
+  await assert.rejects(client.addComment("A-1", "x"), (error: unknown) =>
+    error instanceof Error && !error.message.includes("Write outcome"));
 });

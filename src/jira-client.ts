@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
-import { sessionCookieSchema } from "./cookie.js";
+import { LoginError } from "./login.js";
 
 const nonEmptyString = z.string().refine((value) => value.trim().length > 0);
 
@@ -21,8 +21,8 @@ const jiraUrl = nonEmptyString.refine((value) => {
 
 const settingsSchema = z.object({
   JIRA_URL: jiraUrl,
-  JIRA_COOKIE_NAME: sessionCookieSchema.shape.name,
-  JIRA_COOKIE_VALUE: sessionCookieSchema.shape.value,
+  JIRA_USERNAME: nonEmptyString,
+  JIRA_PASSWORD: z.string().min(1),
 });
 
 interface JiraClientOptions {
@@ -30,6 +30,8 @@ interface JiraClientOptions {
   timeoutMs?: number;
   now?: () => number;
   wait?: (ms: number, signal: AbortSignal) => Promise<void>;
+  /** Log in (first request, and again after HTTP 401); returns the session cookie. */
+  reauth?: () => Promise<{ cookieName: string; cookieValue: string }>;
 }
 
 type JiraErrorKind = "http" | "network" | "timeout" | "format" | "redirect" | "cancelled" | "cooldown";
@@ -56,7 +58,13 @@ export class JiraClient {
   readonly #config: JiraConfig;
   readonly #fetch: typeof fetch;
   readonly #timeoutMs: number;
-  readonly #cookie: string;
+  #cookie = "";
+  #cookieValue = "";
+  // Shared so concurrent expired requests trigger a single login.
+  #loginInFlight: Promise<void> | undefined;
+  // Jira refused the credentials: stop retrying until restart to avoid CAPTCHA lockouts.
+  #loginRejected = false;
+  readonly #reauth: JiraClientOptions["reauth"];
   readonly #activeRequests = new Set<AbortController>();
   #closed = false;
   readonly #now: () => number;
@@ -70,7 +78,11 @@ export class JiraClient {
     this.#timeoutMs = options.timeoutMs ?? 30_000;
     this.#now = options.now ?? Date.now;
     this.#wait = options.wait ?? ((ms, signal) => delay(ms, undefined, { signal }));
-    this.#cookie = `${config.cookieName}=${config.cookieValue}`;
+    if (config.cookieName && config.cookieValue) {
+      this.#cookie = `${config.cookieName}=${config.cookieValue}`;
+      this.#cookieValue = config.cookieValue;
+    }
+    this.#reauth = options.reauth;
   }
 
   close(): void {
@@ -133,7 +145,7 @@ export class JiraClient {
     // Redact before truncating: a partial credential must not survive the limit.
     const secrets = [
       this.#cookie,
-      this.#config.cookieValue,
+      this.#cookieValue,
     ].filter(Boolean).sort((a, b) => b.length - a.length);
     for (const secret of secrets) {
       value = value.replaceAll(secret, "[REDACTED]");
@@ -177,6 +189,35 @@ export class JiraClient {
     }
   }
 
+  async #login(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (this.#loginRejected || !this.#reauth) {
+      throw new JiraRequestError(
+        "Jira rejected the stored credentials. Run `bluntjira login` and restart the MCP server.", "http", 401);
+    }
+    const reauth = this.#reauth;
+    this.#loginInFlight ??= reauth().then((session) => {
+      this.#cookie = `${session.cookieName}=${session.cookieValue}`;
+      this.#cookieValue = session.cookieValue;
+    }).catch((error: unknown) => {
+      if (error instanceof LoginError && error.rejected) this.#loginRejected = true;
+      throw error;
+    }).finally(() => { this.#loginInFlight = undefined; });
+    // shortcut: an aborted request stops waiting but the shared login runs on (<=30s), upgrade if that matters.
+    const aborted = new Promise<never>((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+    try {
+      await Promise.race([this.#loginInFlight, aborted]);
+    } catch (error: unknown) {
+      if (signal.aborted) throw error;
+      // "cooldown" kind: the request was never sent, so it must not be reported as an unknown write outcome.
+      throw new JiraRequestError(
+        `Jira login failed: ${error instanceof LoginError ? error.message : "unknown error"}. Run \`bluntjira login\` if the credentials changed.`,
+        "cooldown", error instanceof LoginError && error.rejected ? 401 : undefined);
+    }
+  }
+
   #retryDelay(attempt: number, response: Response): number {
     const backoff = 1000 * 2 ** attempt + Math.floor(Math.random() * 251);
     const value = response.headers.get("Retry-After");
@@ -195,21 +236,30 @@ export class JiraClient {
     this.#activeRequests.add(controller);
     const deadline = this.#now() + this.#timeoutMs;
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+    let reauthenticated = false;
     try {
-      for (let attempt = 0; ; attempt++) {
+      for (let attempt = 0; ;) {
         this.#assertAvailable();
         controller.signal.throwIfAborted();
+        if (!this.#cookie && this.#reauth) await this.#login(controller.signal);
         const response = await this.#fetch(`${this.#config.url}/rest/api/2${path}`, {
           method: options.method ?? "GET",
           headers: {
             Accept: "application/json",
-            Cookie: this.#cookie,
+            ...(this.#cookie ? { Cookie: this.#cookie } : {}),
             ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
           },
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
           redirect: "manual",
           signal: controller.signal,
         });
+        // Renew an expired session once per request; 401 means nothing was executed, so retrying is safe even for writes.
+        if (response.status === 401 && this.#reauth && !reauthenticated && !this.#loginRejected) {
+          reauthenticated = true;
+          void response.body?.cancel().catch(() => {});
+          await this.#login(controller.signal);
+          continue;
+        }
         // Pause immediately on headers, even if reading the error body later fails.
         if (response.status === 401 || response.status === 403) {
           this.#authStatus = response.status;
@@ -225,6 +275,7 @@ export class JiraClient {
           const failure = this.#httpError(response, text);
           if (options.write || !retryableStatuses.has(response.status) || attempt >= 2) throw failure;
           const waitMs = this.#retryDelay(attempt, response);
+          attempt++;
           // Never retry earlier than Retry-After to fit our time budget.
           if (waitMs >= deadline - this.#now()) throw failure;
           await this.#wait(waitMs, controller.signal);
@@ -261,12 +312,19 @@ export class JiraClient {
 
 export interface JiraConfig {
   readonly url: string;
-  readonly cookieName: string;
-  readonly cookieValue: string;
+  // Absent until the first automatic login.
+  readonly cookieName?: string;
+  readonly cookieValue?: string;
+}
+
+export interface JiraCredentials {
+  readonly url: string;
+  readonly username: string;
+  readonly password: string;
 }
 
 /** Validate stored Jira settings; never include their values in errors. */
-export function loadJiraConfig(settings: unknown): JiraConfig {
+export function loadJiraCredentials(settings: unknown): JiraCredentials {
   const result = settingsSchema.safeParse(settings);
   if (!result.success) {
     // Raw Zod issues can include input values. Expose only known setting names.
@@ -276,7 +334,7 @@ export function loadJiraConfig(settings: unknown): JiraConfig {
 
   return {
     url: result.data.JIRA_URL,
-    cookieName: result.data.JIRA_COOKIE_NAME,
-    cookieValue: result.data.JIRA_COOKIE_VALUE,
+    username: result.data.JIRA_USERNAME,
+    password: result.data.JIRA_PASSWORD,
   };
 }

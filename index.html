@@ -209,7 +209,7 @@
         <article class="feature">
           <div class="section-index">03 / КОНТРОЛИРОВАТЬ</div>
           <h2>Работает локально</h2>
-          <p>stdio-транспорт и твоя Jira-сессия. Пароль не сохраняется, запросы идут от твоей учётной записи.</p>
+          <p>stdio-транспорт и твоя Jira-сессия. Логин и пароль хранятся локально, вход автоматический, запросы идут от твоей учётной записи.</p>
         </article>
       </section>
       <section class="setup" id="setup" aria-labelledby="setup-title">
@@ -231,7 +231,7 @@
               <p>Открой терминал и выполни команду. Отдельно устанавливать bluntjira не нужно.</p>
               <div class="setup-code">
                 <div class="setup-code-label" id="login-code-label">ТЕРМИНАЛ</div>
-                <pre tabindex="0" aria-labelledby="login-code-label"><code>npx -y bluntjira@0.1.0 login</code></pre>
+                <pre tabindex="0" aria-labelledby="login-code-label"><code>npx -y bluntjira@0.2.0 login</code></pre>
               </div>
               <p>Введи полный HTTPS-адрес Jira, например <code>https://jira.example.com</code>, затем логин и пароль. При вводе пароля символы не отображаются. Пароль не сохраняется.</p>
             </div>
@@ -246,17 +246,17 @@
   "mcpServers": {
     "bluntjira": {
       "command": "npx",
-      "args": ["-y", "bluntjira@0.1.0"]
+      "args": ["-y", "bluntjira@0.2.0"]
     }
   }
 }</code></pre>
               </div>
-              <p>Если клиент предлагает отдельные поля, укажи <code>npx</code> в команде, а <code>-y</code> и <code>bluntjira@0.1.0</code> — в аргументах.</p>
+              <p>Если клиент предлагает отдельные поля, укажи <code>npx</code> в команде, а <code>-y</code> и <code>bluntjira@0.2.0</code> — в аргументах.</p>
               <p>Перезапусти приложение или переподключи сервер. Затем напиши в чате: «Покажи доступные проекты Jira».</p>
             </div>
           </li>
         </ol>
-        <p class="setup-note">Помощник действует с твоими правами Jira и может изменять реальные задачи. Включи подтверждение действий в AI-приложении, если оно это поддерживает. Данные сессии хранятся в <code>~/.bluntjira/settings.json</code> — не передавай этот файл другим.</p>
+        <p class="setup-note">Помощник действует с твоими правами Jira и может изменять реальные задачи. Включи подтверждение действий в AI-приложении, если оно это поддерживает. Логин и пароль хранятся открытым текстом в <code>~/.bluntjira/settings.json</code> — не передавай этот файл другим.</p>
       </section>
     </main>
     <footer class="footer container">

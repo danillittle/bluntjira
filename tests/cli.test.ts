@@ -10,7 +10,7 @@ import { createMockJira } from "./fixtures/mock-jira.js";
 import { createSettingsHome } from "./fixtures/settings.js";
 
 const entry = fileURLToPath(new URL("../src/index.js", import.meta.url));
-const credentials = { JIRA_COOKIE_NAME: "JSESSIONID", JIRA_COOKIE_VALUE: "cli-test-session" };
+const credentials = { JIRA_USERNAME: "alice", JIRA_PASSWORD: "cli-test-password" };
 
 function environment(home: string, certificate?: string): Record<string, string> {
   return {
@@ -25,7 +25,7 @@ test("compiled CLI handles MCP calls against HTTPS Jira with trusted test CA", {
   const home = await createSettingsHome(t, { JIRA_URL: jira.url, ...credentials });
   const transport = new StdioClientTransport({
     command: process.execPath, args: [entry], stderr: "pipe",
-    env: { ...environment(home, jira.certificate), JIRA_COOKIE_VALUE: "ignored-env-cookie" },
+    env: { ...environment(home, jira.certificate), JIRA_PASSWORD: "ignored-env-password" },
   });
   let stderr = "";
   transport.stderr?.on("data", (chunk) => { stderr += String(chunk); });
@@ -38,7 +38,7 @@ test("compiled CLI handles MCP calls against HTTPS Jira with trusted test CA", {
   assert.deepEqual(result.content, [{ type: "text", text: JSON.stringify([{ key: "TEST", name: "Mock Jira" }]) }]);
   assert.equal(jira.requests.length, 1);
   assert.equal(jira.requests[0]?.path, "/jira/rest/api/2/project");
-  assert.equal(jira.requests[0]?.cookie, `${credentials.JIRA_COOKIE_NAME}=${credentials.JIRA_COOKIE_VALUE}`);
+  assert.equal(jira.requests[0]?.cookie, "JSESSIONID=mock-session");
   assert.equal(stderr, "");
 });
 
@@ -51,7 +51,7 @@ test("CLI refuses invalid settings before opening stdio, without exposing creden
   assert.equal(child.status, 1);
   assert.equal(child.stdout, "");
   assert.match(child.stderr, /JIRA_URL/);
-  for (const value of [credentials.JIRA_COOKIE_VALUE, "embedded-secret"]) {
+  for (const value of [credentials.JIRA_PASSWORD, "embedded-secret"]) {
     assert.ok(!child.stderr.includes(value));
   }
 });

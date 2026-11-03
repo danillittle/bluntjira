@@ -3,9 +3,10 @@ import { mkdtemp, readFile, stat, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { authenticateSession, saveSession, serializeSession } from "../src/login.js";
-import { loadJiraConfig } from "../src/jira-client.js";
+import { authenticateSession, saveCredentials, serializeCredentials } from "../src/login.js";
+import { loadJiraCredentials } from "../src/jira-client.js";
 
+const credentials = { url: "https://jira.example.com/jira", username: "alice", password: "secret-password" };
 const session = { url: "https://jira.example.com/jira", cookieName: "JSESSIONID", cookieValue: "opaque-session" };
 
 test("login exchanges credentials for a Jira session cookie", async () => {
@@ -65,11 +66,8 @@ for (const cookie of [
   });
 }
 
-test("a successful login session is accepted by the server configuration loader", async () => {
-  const result = await authenticateSession(session.url, "u", "p", async () => Response.json({
-    session: { name: session.cookieName, value: "opaque:$@#=+/%token" },
-  }));
-  assert.deepEqual(loadJiraConfig(JSON.parse(serializeSession(result))), result);
+test("saved credentials are accepted by the server configuration loader", () => {
+  assert.deepEqual(loadJiraCredentials(JSON.parse(serializeCredentials(credentials))), credentials);
 });
 
 for (const phase of ["headers", "body"] as const) {
@@ -118,22 +116,19 @@ test("successful login clears its timeout", async (t) => {
   assert.equal(signal.aborted, false);
 });
 
-test("serializes only the Jira session as JSON, not username or password", () => {
-  const serialized = serializeSession(session);
-  assert.deepEqual(JSON.parse(serialized), {
-    JIRA_URL: session.url,
-    JIRA_COOKIE_NAME: session.cookieName,
-    JIRA_COOKIE_VALUE: session.cookieValue,
+test("serializes URL, username and password as JSON", () => {
+  assert.deepEqual(JSON.parse(serializeCredentials(credentials)), {
+    JIRA_URL: credentials.url,
+    JIRA_USERNAME: credentials.username,
+    JIRA_PASSWORD: credentials.password,
   });
-  assert.ok(!serialized.includes("JIRA_USER"));
-  assert.ok(!serialized.includes("JIRA_PASS"));
 });
 
-test("saves the session with owner-only file permissions", async (t) => {
+test("saves credentials with owner-only file permissions", async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(), "bluntjira-login-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const file = path.join(directory, "settings.json");
-  await saveSession(session, file);
-  assert.equal(await readFile(file, "utf8"), serializeSession(session));
+  await saveCredentials(credentials, file);
+  assert.equal(await readFile(file, "utf8"), serializeCredentials(credentials));
   assert.equal((await stat(file)).mode & 0o777, 0o600);
 });

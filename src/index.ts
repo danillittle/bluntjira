@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { JiraClient, loadJiraConfig } from "./jira-client.js";
+import { JiraClient, loadJiraCredentials } from "./jira-client.js";
 import { registerTools } from "./tools.js";
-import { LoginError, runLogin } from "./login.js";
+import { authenticateSession, LoginError, runLogin } from "./login.js";
 import { readSettings, SettingsError } from "./settings.js";
 
 // Source: https://github.com/modelcontextprotocol/typescript-sdk/blob/v1.x/docs/server.md#stdio
 async function main(): Promise<void> {
   const settings = await readSettings();
-  const config = loadJiraConfig(settings);
-  const server = new McpServer({ name: "bluntjira", version: "0.1.0" });
-  const jira = new JiraClient(config);
+  const credentials = loadJiraCredentials(settings);
+  const authenticate = () => authenticateSession(credentials.url, credentials.username, credentials.password);
+  const server = new McpServer({ name: "bluntjira", version: "0.2.0" });
+  const jira = new JiraClient({ url: credentials.url }, { reauth: authenticate });
   registerTools(server, jira);
   let stopping = false;
   async function shutdown(): Promise<void> {
@@ -52,7 +53,7 @@ if (process.argv[2] === "login") {
   });
 } else {
   main().catch((error: unknown) => {
-    const message = error instanceof SettingsError || (error instanceof Error && error.message.startsWith("Invalid Jira settings:"))
+    const message = error instanceof SettingsError || error instanceof LoginError || (error instanceof Error && error.message.startsWith("Invalid Jira settings:"))
       ? error.message
       : "Unable to start bluntjira";
     process.stderr.write(`${message}\n`);

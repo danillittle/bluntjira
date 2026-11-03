@@ -7,19 +7,30 @@ import { StringDecoder } from "node:string_decoder";
 import { sessionCookieSchema } from "./cookie.js";
 
 // Only messages constructed by login itself are safe to print in the CLI.
-export class LoginError extends Error {}
+export class LoginError extends Error {
+  // True when Jira refused the credentials themselves (not a network or format problem).
+  constructor(message: string, readonly rejected = false) {
+    super(message);
+  }
+}
 
-export interface JiraSession {
+export interface LoginResult {
   url: string;
   cookieName: string;
   cookieValue: string;
 }
 
-export function serializeSession(session: JiraSession): string {
+export interface StoredCredentials {
+  url: string;
+  username: string;
+  password: string;
+}
+
+export function serializeCredentials(credentials: StoredCredentials): string {
   return `${JSON.stringify({
-    JIRA_URL: session.url,
-    JIRA_COOKIE_NAME: session.cookieName,
-    JIRA_COOKIE_VALUE: session.cookieValue,
+    JIRA_URL: credentials.url,
+    JIRA_USERNAME: credentials.username,
+    JIRA_PASSWORD: credentials.password,
   }, null, 2)}\n`;
 }
 
@@ -28,7 +39,7 @@ export async function authenticateSession(
   user: string,
   password: string,
   fetcher: typeof fetch = globalThis.fetch,
-): Promise<JiraSession> {
+): Promise<LoginResult> {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
@@ -52,7 +63,7 @@ export async function authenticateSession(
     });
     if (!response.ok) {
       void response.body?.cancel().catch(() => {});
-      throw new LoginError(`Jira login failed (HTTP ${response.status})`);
+      throw new LoginError(`Jira login failed (HTTP ${response.status})`, response.status === 401 || response.status === 403);
     }
     let payload: unknown;
     try {
@@ -78,14 +89,14 @@ export async function authenticateSession(
   }
 }
 
-export async function saveSession(
-  session: JiraSession,
+export async function saveCredentials(
+  credentials: StoredCredentials,
   filePath = path.join(homedir(), ".bluntjira", "settings.json"),
 ): Promise<void> {
   const directory = path.dirname(filePath);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
-  await writeFile(filePath, serializeSession(session), { mode: 0o600 });
+  await writeFile(filePath, serializeCredentials(credentials), { mode: 0o600 });
   await chmod(filePath, 0o600);
 }
 
@@ -132,8 +143,9 @@ export async function runLogin(): Promise<void> {
     const password = await readHidden("Jira password (input hidden): ");
     if (!url || !user || !password) throw new LoginError("Jira URL, username, and password are required");
     const session = await authenticateSession(url, user, password);
-    await saveSession(session);
-    stdout.write(`Jira session saved to ${path.join(homedir(), ".bluntjira", "settings.json")} (permissions 600). Run login again after the session expires.\n`);
+    // Login is verified first so a typo never overwrites working settings.
+    await saveCredentials({ url: session.url, username: user, password });
+    stdout.write(`Jira credentials saved to ${path.join(homedir(), ".bluntjira", "settings.json")} (permissions 600). The server logs in automatically.\n`);
   } finally {
     terminal.close();
   }

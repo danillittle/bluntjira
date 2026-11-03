@@ -9,7 +9,7 @@ import { registerTools } from "../src/tools.js";
 const config = { url: "https://jira.example.com/jira", cookieName: "JSESSIONID", cookieValue: "test-session-token" };
 
 async function connect(fetchImpl: typeof fetch, timeoutMs = 30_000) {
-  const server = new McpServer({ name: "bluntjira", version: "0.1.0" });
+  const server = new McpServer({ name: "bluntjira", version: "0.2.0" });
   registerTools(server, new JiraClient(config, { fetch: fetchImpl, timeoutMs }));
   const client = new Client({ name: "operations-test", version: "1.0.0" });
   const [local, remote] = InMemoryTransport.createLinkedPair();
