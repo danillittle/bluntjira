@@ -1,268 +1,154 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#10110f" />
-    <meta name="description" content="bluntjira — локальный MCP-сервер для Jira Server и Data Center. Запуск из npm через npx, доступ к задачам через Jira REST API v2." />
-    <title>bluntjira — Jira, без лишних слов</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #10110f;
-        --panel: #171914;
-        --line: #303329;
-        --text: #f0f0e8;
-        --muted: #a3a69a;
-        --lime: #c5fa67;
-        --sans: "IBM Plex Sans", system-ui, sans-serif;
-        --mono: "IBM Plex Mono", monospace;
-      }
-      *, *::before, *::after { box-sizing: border-box; }
-      html { scroll-behavior: smooth; scroll-padding-top: 24px; }
-      body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-      a { color: inherit; text-decoration: none; }
-      a:focus-visible { outline: 2px solid var(--lime); outline-offset: 6px; }
-      a:hover { color: var(--lime); }
-      p, h1, h2, h3 { margin: 0; }
-      .container { width: min(1120px, calc(100% - 64px)); margin-inline: auto; }
-      .skip-link { position: absolute; top: 12px; left: 16px; z-index: 10; padding: 12px; background: var(--lime); color: var(--bg); transform: translateY(-160%); }
-      .skip-link:focus { transform: none; color: var(--bg); }
-      .header { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); }
-      .brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; font-size: 20px; font-weight: 700; letter-spacing: -1px; }
-      .brand-name { white-space: nowrap; }
-      .brand-name span { color: var(--lime); }
-      .brand-mark { display: grid; place-items: center; width: 28px; height: 30px; background: var(--lime); color: var(--bg); font-size: 20px; clip-path: polygon(24% 0,100% 0,76% 100%,0 100%); }
-      .nav { display: flex; align-items: center; gap: 32px; font-size: 12px; color: var(--muted); }
-      .github-link { padding: 10px 16px; border: 1px solid var(--line); color: var(--text); transition: border-color .2s, background .2s; }
-      .github-link:hover { border-color: var(--lime); background: #c5fa6708; }
-      .hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: center; padding-block: 100px 88px; }
-      .hero-copy, .visual { min-width: 0; }
-      .eyebrow { display: flex; align-items: center; gap: 10px; color: var(--lime); font: 10px/1.7 var(--mono); text-transform: uppercase; letter-spacing: .1em; }
-      .status-dot { display: inline-block; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px #c5fa6750; }
-      h1 { margin-block: 28px 24px; font-size: clamp(56px, 5.8vw, 76px); line-height: 1.06; font-weight: 700; letter-spacing: -.065em; }
-      h1 em { color: var(--lime); font-style: normal; }
-      .hero-description { max-width: 420px; color: var(--muted); font-size: 14px; line-height: 1.9; }
-      .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; margin-top: 32px; font-size: 12px; }
-      .primary-link { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 20px; background: var(--lime); color: var(--bg); font-weight: 700; transition: background .2s; }
-      .primary-link:hover { color: var(--bg); background: #d4ff8d; }
-      .secondary-link { padding-block: 12px; }
-      .metadata { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 24px; color: var(--muted); font: 11px/1.7 var(--mono); }
-      .metadata span + span::before { content: "·"; margin-right: 16px; color: var(--lime); }
-      .visual { position: relative; display: grid; align-content: center; min-height: 400px; padding-block: 40px; }
-      .orbit { position: absolute; z-index: -1; width: 350px; max-width: 100%; aspect-ratio: 1; border: 1px solid #c5fa6717; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-      .orbit::after { content: ""; position: absolute; top: 50px; left: 50px; width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 16px #c5fa6770; }
-      .terminal { position: relative; border: 1px solid #3a3e30; border-radius: 8px; background: var(--panel); box-shadow: 0 24px 64px #0004; overflow: hidden; }
-      .terminal-header { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11px/1.5 var(--mono); }
-      .window-dots { display: flex; gap: 5px; }
-      .window-dots i { width: 6px; height: 6px; border-radius: 50%; background: #626756; }
-      .window-dots i:first-child { background: #a1a68e; }
-      .terminal-body { padding: 20px; font: 11px/1.9 var(--mono); }
-      .terminal-comment { margin-bottom: 14px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
-      .code-line { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; margin-block: 5px; }
-      .line-number { color: #959a89; user-select: none; }
-      .code-line > span:last-child { overflow-wrap: anywhere; }
-      .token { color: var(--lime); }
-      .string { color: #c0d69e; }
-      .terminal hr { margin-block: 16px; border: 0; border-top: 1px solid var(--line); }
-      .terminal-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 10px; }
-      .terminal-status span:first-child { display: inline-flex; align-items: center; gap: 7px; color: var(--text); }
-      .session-label { position: absolute; right: 16px; top: 16px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font: 10px/1.5 var(--mono); }
-      .visual-caption { margin-top: 20px; text-align: center; color: var(--muted); font: 10px/1.8 var(--mono); letter-spacing: .06em; }
-      .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--line); }
-      .feature { padding: 32px 28px; }
-      .feature:first-child { padding-left: 0; }
-      .feature:last-child { padding-right: 0; }
-      .feature + .feature { border-left: 1px solid var(--line); }
-      .section-index { color: var(--lime); font: 11px/1.6 var(--mono); letter-spacing: .04em; }
-      .feature h2 { margin-block: 16px 10px; font-size: 17px; line-height: 1.4; font-weight: 700; letter-spacing: -.03em; }
-      .feature p { color: var(--muted); font-size: 14px; line-height: 1.7; }
-      .setup { padding-block: 88px; }
-      .setup-header { display: flex; align-items: end; justify-content: space-between; gap: 32px; margin-bottom: 32px; }
-      .setup h2 { margin-top: 12px; font-size: clamp(26px, 3vw, 36px); line-height: 1.25; letter-spacing: -.045em; }
-      .setup-header > p { max-width: 330px; color: var(--muted); font-size: 14px; line-height: 1.7; }
-      .steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); counter-reset: setup; }
-      .step { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 24px; padding-block: 32px; border-bottom: 1px solid var(--line); counter-increment: setup; }
-      .step::before { content: counter(setup, decimal-leading-zero); color: var(--lime); font: 14px/28px var(--mono); }
-      .step-content { min-width: 0; }
-      .step h3 { margin-bottom: 12px; font-size: 20px; line-height: 1.4; letter-spacing: -.025em; }
-      .step p { max-width: 680px; color: var(--muted); font-size: 14px; line-height: 1.8; }
-      .step p + p { margin-top: 12px; }
-      .step a { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }
-      .step a:hover { color: var(--lime); }
-      .setup-code { margin-block: 20px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
-      .setup-code-label { padding: 10px 20px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11px/1.6 var(--mono); }
-      .setup-code pre { margin: 0; padding: 20px; overflow-x: auto; font: 13px/1.9 var(--mono); }
-      .setup-code code { font-size: inherit; overflow-wrap: normal; }
-      .setup-code pre:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
-      .setup-note { margin-top: 24px; padding-left: 16px; border-left: 2px solid var(--lime); color: var(--muted); font-size: 14px; line-height: 1.7; }
-      code { font-family: var(--mono); font-size: .9em; color: #d9e6c3; overflow-wrap: anywhere; }
-      .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding-block: 28px; border-top: 1px solid var(--line); color: var(--muted); font: 11px/1.8 var(--mono); }
-      .footer .brand { color: var(--text); font-family: var(--sans); font-size: 17px; }
-      .footer-links { display: flex; gap: 24px; }
-      @media (max-width: 1000px) {
-        .hero { gap: 32px; padding-block: 72px; }
-        h1 { font-size: clamp(48px, 6.4vw, 64px); }
-        .terminal-body { padding: 16px; font-size: 10px; }
-        .feature { padding-inline: 20px; }
-      }
-      @media (max-width: 760px) {
-        .container { width: calc(100% - 40px); }
-        .header { min-height: 80px; flex-wrap: wrap; gap: 16px; padding-block: 20px; }
-        .nav { flex-wrap: wrap; gap: 20px; font-size: 11px; }
-        .hero { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-block: 56px 40px; }
-        .hero-copy { max-width: 540px; }
-        h1 { font-size: clamp(48px, 10.5vw, 76px); }
-        .visual { width: 100%; max-width: 480px; margin-inline: auto; min-height: 360px; }
-        .terminal-body { padding: 20px; font-size: 11px; }
-        .features { grid-template-columns: minmax(0, 1fr); }
-        .feature, .feature:first-child, .feature:last-child { padding: 24px 0; }
-        .feature + .feature { border-left: 0; border-top: 1px solid var(--line); }
-        .feature h2 { margin-top: 12px; }
-        .feature p { max-width: 460px; font-size: 13px; }
-        .setup { padding-block: 56px; }
-        .setup-header { align-items: start; flex-direction: column; gap: 20px; }
-        .setup-header > p { max-width: 420px; font-size: 13px; }
-        .step { grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding-block: 24px; }
-        .step h3 { font-size: 18px; }
-        .setup-code pre { padding: 16px 12px; font-size: 11px; }
-        .setup-code-label { padding-inline: 12px; }
-        .footer { gap: 20px; }
-      }
-      @media (max-width: 400px) {
-        .header { align-items: start; }
-        .nav { width: 100%; justify-content: space-between; gap: 8px; }
-        .github-link { padding: 8px 12px; }
-        .eyebrow { font-size: 9px; letter-spacing: .04em; }
-        h1 { font-size: 48px; }
-        .actions { align-items: start; flex-direction: column; gap: 8px; }
-        .primary-link { width: 100%; gap: 12px; padding-inline: 16px; font-size: 11px; }
-        .terminal-header { gap: 8px; padding-inline: 12px; font-size: 9px; }
-        .terminal-body { padding: 16px 12px; font-size: 10px; }
-        .visual-caption { font-size: 9px; }
-        .footer > p { width: 100%; order: 1; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        html { scroll-behavior: auto; }
-        *, *::before, *::after { transition: none !important; }
-      }
-    </style>
-  </head>
-  <body id="top">
-    <a class="skip-link" href="#main">К содержимому</a>
-    <header class="header container">
-      <a class="brand" href="#top" aria-label="bluntjira — на главную"><span class="brand-mark" aria-hidden="true">b</span><span class="brand-name">blunt<span>jira</span></span></a>
-      <nav class="nav" aria-label="Основная навигация">
-        <a href="#features">Возможности</a>
-        <a href="#setup">Подключение</a>
-        <a class="github-link" href="https://github.com/danillittle/bluntjira">GitHub</a>
-      </nav>
-    </header>
-    <main class="container" id="main">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <div class="eyebrow"><span class="status-dot" aria-hidden="true"></span>Локальный MCP-сервер для Jira</div>
-          <h1 id="hero-title">Jira.<br /><em>Без церемоний.</em></h1>
-          <p class="hero-description">Подключи AI к Jira Server и Data Center. Ищи задачи, читай контекст и меняй статусы — через понятный, локальный MCP-сервер.</p>
-          <div class="actions">
-            <a class="primary-link" href="#setup">Начать</a>
-          </div>
-          <div class="metadata"><span>Node.js 24+</span><span>Jira REST API v2</span><span>MCP · stdio</span></div>
-        </div>
-        <div class="visual" role="group" aria-label="Пример работы MCP-сервера с Jira">
-          <div class="orbit" aria-hidden="true"></div>
-          <div class="session-label">Твои права Jira. Твои данные.</div>
-          <div class="terminal">
-            <div class="terminal-header">
-              <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-              <span>bluntjira · stdio</span><span>local</span>
-            </div>
-            <div class="terminal-body">
-              <p class="terminal-comment">// AI-клиент / bluntjira / твоя Jira</p>
-              <div class="code-line"><span class="line-number" aria-hidden="true">01</span><span><span class="token">tool</span> jira_search</span></div>
-              <div class="code-line"><span class="line-number" aria-hidden="true">02</span><span><span class="token">jql</span> = <span class="string">"project = ATLAS AND status = Open"</span></span></div>
-              <div class="code-line"><span class="line-number" aria-hidden="true">03</span><span><span class="token">limit</span> = 10</span></div>
-              <hr />
-              <div class="code-line"><span class="line-number" aria-hidden="true">04</span><span><span class="token">result</span>: 10 задач найдены</span></div>
-              <div class="code-line"><span class="line-number" aria-hidden="true">05</span><span><span class="token">auth</span>: session cookie</span></div>
-              <hr />
-              <div class="terminal-status"><span><i class="status-dot" aria-hidden="true"></i>подключение локальное</span><span>JIRA REST /api/2</span></div>
-            </div>
-          </div>
-          <p class="visual-caption">ОДИН ПРОЦЕСС · ТВОЯ СЕССИЯ · БЕЗ ПОСРЕДНИКОВ</p>
-        </div>
-      </section>
-      <section class="features" id="features" aria-label="Возможности">
-        <article class="feature">
-          <div class="section-index">01 / ЧИТАТЬ</div>
-          <h2>Весь контекст под рукой</h2>
-          <p>Проекты, задачи, комментарии, доступные переходы. Ищи нужное прямо через JQL.</p>
-        </article>
-        <article class="feature">
-          <div class="section-index">02 / ДЕЙСТВОВАТЬ</div>
-          <h2>Не только смотреть</h2>
-          <p>Создавай задачи, обновляй поля, комментируй и запускай переходы статусов.</p>
-        </article>
-        <article class="feature">
-          <div class="section-index">03 / КОНТРОЛИРОВАТЬ</div>
-          <h2>Работает локально</h2>
-          <p>stdio-транспорт и твоя Jira-сессия. Логин и пароль хранятся локально, вход автоматический, запросы идут от твоей учётной записи.</p>
-        </article>
-      </section>
-      <section class="setup" id="setup" aria-labelledby="setup-title">
-        <div class="setup-header">
-          <div><div class="section-index">ПОДКЛЮЧЕНИЕ</div><h2 id="setup-title">Три шага — и Jira в чате.</h2></div>
-          <p>Без клонирования репозитория и сборки. npx загрузит пакет и запустит сервер на твоём компьютере.</p>
-        </div>
-        <ol class="steps" role="list">
-          <li class="step">
-            <div class="step-content">
-              <h3>Подготовь окружение</h3>
-              <p>Установи <a href="https://nodejs.org/">Node.js 24 или новее</a> с npm. Понадобится AI-приложение с поддержкой локальных MCP-серверов (stdio).</p>
-              <p>Поддерживаются Jira Server и Data Center с входом по логину и паролю. Если Jira в корпоративной сети, сначала подключись к ней или включи VPN. Jira Cloud и вход только через SSO не поддерживаются.</p>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-content">
-              <h3>Войди в Jira</h3>
-              <p>Открой терминал и выполни команду. Отдельно устанавливать bluntjira не нужно.</p>
-              <div class="setup-code">
-                <div class="setup-code-label" id="login-code-label">ТЕРМИНАЛ</div>
-                <pre tabindex="0" aria-labelledby="login-code-label"><code>npx -y bluntjira@0.2.0 login</code></pre>
-              </div>
-              <p>Введи полный HTTPS-адрес Jira, например <code>https://jira.example.com</code>, затем логин и пароль. При вводе пароля символы не отображаются. Пароль не сохраняется.</p>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-content">
-              <h3>Подключи AI-приложение</h3>
-              <p>Открой настройки MCP своего клиента и добавь сервер. Расположение настроек зависит от приложения.</p>
-              <div class="setup-code">
-                <div class="setup-code-label" id="mcp-code-label">КОНФИГУРАЦИЯ MCP · JSON</div>
-                <pre tabindex="0" aria-labelledby="mcp-code-label"><code>{
-  "mcpServers": {
-    "bluntjira": {
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#10110f" />
+        <meta
+            name="description"
+            content="bluntjira — локальный MCP-сервер для Jira Server и Data Center. Запуск из npm через npx, доступ к задачам через Jira REST API v2."
+        />
+        <title>bluntjira — Jira, без лишних слов</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+        <style type="text/tailwindcss">
+            @layer base {
+                :root { color-scheme: dark; }
+                body { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+                .font-mono, code { font-family: "IBM Plex Mono", monospace; }
+                :focus-visible { outline: 2px solid #c5fa67; outline-offset: 5px; }
+                pre:focus-visible { outline-offset: -2px; }
+                summary::-webkit-details-marker { display: none; }
+            }
+        </style>
+        <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23c5fa67'/%3E%3Ctext x='10' y='29' font-family='monospace' font-size='30' font-weight='bold'%3Eb%3C/text%3E%3C/svg%3E" />
+    </head>
+    <body id="top" class="bg-[#10110f] text-[#f0f0e8] antialiased selection:bg-[#c5fa67] selection:text-[#10110f]">
+        <a href="#main" class="sr-only z-50 bg-[#c5fa67] p-4 text-black focus:not-sr-only focus:absolute focus:left-4 focus:top-4">Перейти к содержимому</a>
+        <div class="mx-auto max-w-7xl px-5 sm:px-10 lg:px-16">
+            <header class="flex min-h-24 flex-wrap items-center justify-between gap-4 border-b border-white/15 py-5">
+                <a href="#top" aria-label="bluntjira — на главную" class="flex items-center gap-3 text-2xl font-semibold tracking-tight">
+                    <span aria-hidden="true" class="flex size-8 -skew-x-12 items-center justify-center bg-[#c5fa67] font-mono text-xl text-[#10110f]">b</span>
+                    <span>blunt<span class="text-[#c5fa67]">jira</span></span>
+                </a>
+                <nav aria-label="Основная навигация" class="flex items-center gap-5 text-sm sm:gap-8">
+                    <a href="#features" class="hidden text-[#a3a69a] transition-colors hover:text-[#c5fa67] sm:block">Возможности</a>
+                    <a href="#setup" class="text-[#a3a69a] transition-colors hover:text-[#c5fa67]">Подключение</a>
+                    <a href="https://github.com/danillittle/bluntjira" class="flex min-h-11 items-center gap-3 border border-white/20 px-4 transition-colors hover:border-[#c5fa67] hover:text-[#c5fa67]">GitHub <span aria-hidden="true">↗</span></a>
+                </nav>
+            </header>
+            <main id="main">
+                <section aria-labelledby="hero-title" class="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:py-28">
+                    <div>
+                        <p class="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[#c5fa67]"><span aria-hidden="true" class="size-1.5 shrink-0 rounded-full bg-[#c5fa67]"></span>Локальный MCP-сервер для Jira</p>
+                        <h1 id="hero-title" class="mt-7 text-[clamp(3.4rem,6.2vw,5.25rem)] font-semibold leading-[1.02] tracking-[-0.065em]">Меньше Jira.<br />Больше <span class="text-[#c5fa67]">дела.</span></h1>
+                        <p class="mt-7 max-w-md text-base leading-7 text-[#a3a69a]">Задачи, комментарии и статусы — прямо в твоём AI-клиенте. Подключи Jira Server или Data Center и работай, не выходя из чата.</p>
+                        <div class="mt-9 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm">
+                            <a href="#setup" class="inline-flex min-h-12 items-center gap-8 bg-[#c5fa67] px-6 py-4 font-semibold text-[#10110f] transition-colors hover:bg-[#d7ff98]">Подключить Jira <span aria-hidden="true">↗</span></a>
+                            <a href="https://github.com/danillittle/bluntjira#readme" class="inline-flex min-h-12 items-center gap-3 hover:text-[#c5fa67]">Документация <span aria-hidden="true">↗</span></a>
+                        </div>
+                        <p class="mt-6 font-mono text-[11px] leading-6 text-[#a3a69a]">Open source <span class="px-2 text-[#c5fa67]">/</span> MIT <span class="px-2 text-[#c5fa67]">/</span> Node.js 24+</p>
+                    </div>
+                    <figure class="relative min-w-0 lg:pt-5">
+                        <div aria-hidden="true" class="absolute -inset-5 -z-10 bg-[radial-gradient(ellipse_at_center,#c5fa670b,transparent_70%)]"></div>
+                        <div class="overflow-hidden rounded-lg border border-[#3a3e30] bg-[#171914] shadow-[0_24px_64px_#0003]">
+                            <div class="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 font-mono text-[10px] text-[#a3a69a]">
+                                <div aria-hidden="true" class="flex gap-1.5"><span class="size-2 rounded-full bg-[#6c725e]"></span><span class="size-2 rounded-full bg-[#454b3b]"></span><span class="size-2 rounded-full bg-[#454b3b]"></span></div>
+                                <span>workspace / ai-chat</span><span class="text-[#c5fa67]">MCP</span>
+                            </div>
+                            <div class="space-y-6 p-5 sm:p-7">
+                                <div class="flex items-start gap-3">
+                                    <span aria-hidden="true" class="flex size-7 shrink-0 items-center justify-center border border-white/20 font-mono text-xs text-[#a3a69a]">ты</span>
+                                    <p class="pt-0.5 text-sm leading-6">Покажи мои незакрытые задачи.</p>
+                                </div>
+                                <div class="ml-10 border-l border-[#c5fa67]/40 pl-4 font-mono text-[10px] leading-6 text-[#a3a69a]"><span class="text-[#c5fa67]">↳ bluntjira</span> / поиск задач<br />assignee = currentUser()<br />AND resolution = Unresolved</div>
+                                <div class="flex items-start gap-3">
+                                    <span aria-hidden="true" class="flex size-7 shrink-0 items-center justify-center bg-[#c5fa67] font-mono text-sm font-semibold text-[#10110f]">b</span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="mb-4 pt-0.5 text-sm">Нашёл 3 задачи:</p>
+                                        <ul class="divide-y divide-white/10 border-y border-white/10 text-xs">
+                                            <li class="py-3"><div class="flex items-center justify-between gap-2 font-mono text-[10px]"><span class="text-[#c5fa67]">APP-128</span><span class="text-[#d6c79a]">В работе</span></div><p class="mt-1.5 leading-5">Исправить ошибку авторизации</p></li>
+                                            <li class="py-3"><div class="flex items-center justify-between gap-2 font-mono text-[10px]"><span class="text-[#c5fa67]">APP-124</span><span class="text-[#a3a69a]">К выполнению</span></div><p class="mt-1.5 leading-5">Обновить документацию API</p></li>
+                                            <li class="py-3"><div class="flex items-center justify-between gap-2 font-mono text-[10px]"><span class="text-[#c5fa67]">APP-119</span><span class="text-[#a3a69a]">К выполнению</span></div><p class="mt-1.5 leading-5">Добавить фильтры в поиск</p></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-[#1c1f18] px-5 py-3 font-mono text-[10px] text-[#a3a69a]"><span><span aria-hidden="true" class="mr-2 text-[#c5fa67]">●</span>bluntjira подключён</span><span>stdio · Jira REST API v2</span></div>
+                        </div>
+                        <figcaption class="mt-4 text-center font-mono text-[10px] tracking-wide text-[#a3a69a]">Пример диалога. Твои задачи — в твоём AI-клиенте.</figcaption>
+                    </figure>
+                </section>
+                <section id="features" aria-label="Возможности" class="grid scroll-mt-8 border-y border-white/15 md:grid-cols-3">
+                    <article class="py-8 md:pr-8">
+                        <p class="font-mono text-xs text-[#c5fa67]">01 / НАХОДИ</p>
+                        <h2 class="mt-5 text-xl font-medium tracking-tight">Контекст без переключений</h2>
+                        <p class="mt-3 text-sm leading-6 text-[#a3a69a]">Ищи задачи, читай описания и обсуждения. Спроси обычными словами — помощник обратится к Jira.</p>
+                    </article>
+                    <article class="border-y border-white/15 py-8 md:border-x md:border-y-0 md:px-8">
+                        <p class="font-mono text-xs text-[#c5fa67]">02 / ДЕЙСТВУЙ</p>
+                        <h2 class="mt-5 text-xl font-medium tracking-tight">От разговора к результату</h2>
+                        <p class="mt-3 text-sm leading-6 text-[#a3a69a]">Создавай задачи, добавляй комментарии и меняй статусы. Без путешествий по вкладкам.</p>
+                    </article>
+                    <article class="py-8 md:pl-8">
+                        <p class="font-mono text-xs text-[#c5fa67]">03 / КОНТРОЛИРУЙ</p>
+                        <h2 class="mt-5 text-xl font-medium tracking-tight">Твоя Jira. Твои права.</h2>
+                        <p class="mt-3 text-sm leading-6 text-[#a3a69a]">MCP-сервер работает на твоём компьютере. Доступ к задачам — в рамках твоей учётной записи.</p>
+                    </article>
+                </section>
+                <section id="setup" aria-labelledby="setup-title" class="scroll-mt-8 py-16 sm:py-24">
+                    <div class="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+                        <div><p class="font-mono text-xs tracking-widest text-[#c5fa67]">GET STARTED</p><h2 id="setup-title" class="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Три шага. И ты в деле.</h2></div>
+                        <p class="max-w-xs text-sm leading-6 text-[#a3a69a]">Нужны Node.js 24+ и AI-клиент с поддержкой локальных MCP-серверов.</p>
+                    </div>
+                    <ol class="divide-y divide-white/15 border-y border-white/15">
+                        <li class="grid gap-5 py-8 sm:grid-cols-[40px_1fr] lg:grid-cols-[40px_0.85fr_1.15fr] lg:gap-8">
+                            <span aria-hidden="true" class="font-mono text-sm text-[#c5fa67]">01</span>
+                            <div><h3 class="text-xl font-medium">Войди в Jira</h3><p class="mt-3 max-w-md text-sm leading-6 text-[#a3a69a]">Выполни команду и введи HTTPS-адрес Jira, логин и пароль. Если нужен VPN — подключи его заранее.</p></div>
+                            <div class="min-w-0 border border-white/15 bg-[#171914] sm:col-start-2 lg:col-start-auto"><p class="border-b border-white/10 px-5 py-3 font-mono text-[10px] text-[#a3a69a]">ТЕРМИНАЛ</p><pre tabindex="0" aria-label="Команда входа в Jira" class="overflow-x-auto p-5 font-mono text-xs leading-6 sm:text-sm"><code><span class="text-[#c5fa67]">npx</span> -y bluntjira@0.2.0 login</code></pre></div>
+                        </li>
+                        <li class="grid gap-5 py-8 sm:grid-cols-[40px_1fr] lg:grid-cols-[40px_0.85fr_1.15fr] lg:gap-8">
+                            <span aria-hidden="true" class="font-mono text-sm text-[#c5fa67]">02</span>
+                            <div><h3 class="text-xl font-medium">Подключи MCP-сервер</h3><p class="mt-3 max-w-md text-sm leading-6 text-[#a3a69a]">Добавь конфигурацию в настройки MCP своего AI-приложения. Затем перезапусти приложение или переподключи сервер.</p><a href="https://github.com/danillittle/bluntjira#подключение" class="mt-4 inline-flex min-h-11 items-center gap-3 text-sm underline decoration-white/30 underline-offset-4 hover:text-[#c5fa67]">Подробнее о настройке <span aria-hidden="true">↗</span></a></div>
+                            <div class="min-w-0 border border-white/15 bg-[#171914] sm:col-start-2 lg:col-start-auto"><p class="border-b border-white/10 px-5 py-3 font-mono text-[10px] text-[#a3a69a]">НАСТРОЙКИ MCP · JSON</p><pre tabindex="0" aria-label="Конфигурация MCP-сервера" class="overflow-x-auto p-5 font-mono text-xs leading-6"><code>{
+  <span class="text-[#c5fa67]">"mcpServers"</span>: {
+    <span class="text-[#c5fa67]">"bluntjira"</span>: {
       "command": "npx",
       "args": ["-y", "bluntjira@0.2.0"]
     }
   }
-}</code></pre>
-              </div>
-              <p>Если клиент предлагает отдельные поля, укажи <code>npx</code> в команде, а <code>-y</code> и <code>bluntjira@0.2.0</code> — в аргументах.</p>
-              <p>Перезапусти приложение или переподключи сервер. Затем напиши в чате: «Покажи доступные проекты Jira».</p>
-            </div>
-          </li>
-        </ol>
-        <p class="setup-note">Помощник действует с твоими правами Jira и может изменять реальные задачи. Включи подтверждение действий в AI-приложении, если оно это поддерживает. Логин и пароль хранятся открытым текстом в <code>~/.bluntjira/settings.json</code> — не передавай этот файл другим.</p>
-      </section>
-    </main>
-    <footer class="footer container">
-      <a class="brand" href="#top" aria-label="bluntjira — на главную"><span class="brand-mark" aria-hidden="true">b</span><span class="brand-name">blunt<span>jira</span></span></a>
-      <p>Создано для Jira Server / Data Center.</p>
-      <div class="footer-links"><a href="https://github.com/danillittle/bluntjira">GitHub</a><a href="https://github.com/danillittle/bluntjira/blob/master/LICENSE">MIT</a></div>
-    </footer>
-  </body>
+}</code></pre></div>
+                        </li>
+                        <li class="grid gap-5 py-8 sm:grid-cols-[40px_1fr] lg:grid-cols-[40px_0.85fr_1.15fr] lg:gap-8">
+                            <span aria-hidden="true" class="font-mono text-sm text-[#c5fa67]">03</span>
+                            <div><h3 class="text-xl font-medium">Просто спроси</h3><p class="mt-3 max-w-md text-sm leading-6 text-[#a3a69a]">Начни с доступных проектов или своих задач. Помощник сам подберёт нужный инструмент.</p></div>
+                            <div class="flex items-center gap-4 border border-[#c5fa67]/25 bg-[#c5fa67]/[0.03] p-6 sm:col-start-2 lg:col-start-auto"><span aria-hidden="true" class="font-mono text-xl text-[#c5fa67]">↳</span><p class="text-base leading-7">«Покажи мои незакрытые задачи»</p></div>
+                        </li>
+                    </ol>
+                    <aside aria-label="Безопасность" class="mt-6 border-l-2 border-[#c5fa67]/60 pl-5 text-xs leading-6 text-[#a3a69a]"><p><strong class="font-medium text-[#f0f0e8]">Перед подключением.</strong> Логин и пароль хранятся открытым текстом в <code class="break-all">~/.bluntjira/settings.json</code> (права 600). Не передавай этот файл другим и не добавляй его в Git. Помощник может менять реальные задачи — включи подтверждение действий в AI-клиенте.</p></aside>
+                </section>
+                <section aria-labelledby="faq-title" class="grid gap-8 border-t border-white/15 py-12 md:grid-cols-[1fr_2fr] md:gap-16">
+                    <div><p class="font-mono text-xs tracking-widest text-[#c5fa67]">ПЕРЕД СТАРТОМ</p><h2 id="faq-title" class="mt-4 text-3xl font-medium tracking-tight">Коротко о важном.</h2></div>
+                    <div class="divide-y divide-white/15">
+                        <details class="group"><summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-5 py-4 text-sm font-medium">Работает с Jira Cloud?<span aria-hidden="true" class="text-xl text-[#c5fa67] group-open:rotate-45">+</span></summary><p class="pb-5 text-sm leading-6 text-[#a3a69a]">Нет. Поддерживаются Jira Server и Data Center с входом по логину и паролю. Вход только через браузерный SSO также не поддерживается.</p></details>
+                        <details class="group"><summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-5 py-4 text-sm font-medium">Куда отправляются данные?<span aria-hidden="true" class="text-xl text-[#c5fa67] group-open:rotate-45">+</span></summary><p class="pb-5 text-sm leading-6 text-[#a3a69a]">bluntjira работает локально и обращается к твоему серверу Jira. Результаты передаются AI-клиенту и могут обрабатываться его провайдером модели. Проверь политику своего приложения и правила компании.</p></details>
+                        <details class="group"><summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-5 py-4 text-sm font-medium">Что делать, если запрос завершился ошибкой?<span aria-hidden="true" class="text-xl text-[#c5fa67] group-open:rotate-45">+</span></summary><p class="pb-5 text-sm leading-6 text-[#a3a69a]">Перед повторным созданием задачи или отправкой комментария проверь Jira: действие могло успеть выполниться. Остальные решения — в <a class="underline underline-offset-4 hover:text-[#c5fa67]" href="https://github.com/danillittle/bluntjira#если-не-работает">документации</a>.</p></details>
+                    </div>
+                </section>
+                <section aria-labelledby="closing-title" class="my-8 flex flex-col justify-between gap-8 border border-[#c5fa67]/25 bg-[#c5fa67]/[0.03] px-6 py-10 sm:px-10 md:flex-row md:items-center">
+                    <div><p class="font-mono text-[10px] uppercase tracking-widest text-[#c5fa67]">Меньше кликов. Больше контекста.</p><h2 id="closing-title" class="mt-3 text-3xl font-medium tracking-tight">Jira уже есть. Добавь bluntjira.</h2></div>
+                    <a href="#setup" class="inline-flex min-h-12 shrink-0 items-center justify-between gap-8 self-start bg-[#c5fa67] px-6 py-4 text-sm font-semibold text-[#10110f] hover:bg-[#d7ff98] md:self-center">Начать работу <span aria-hidden="true">↗</span></a>
+                </section>
+            </main>
+            <footer class="mt-12 flex flex-col justify-between gap-5 border-t border-white/15 py-7 text-xs text-[#a3a69a] sm:flex-row sm:items-center">
+                <p><span class="mr-4 font-semibold text-[#f0f0e8]">bluntjira</span> © 2026 Danil Shagimardanov</p>
+                <div class="flex flex-wrap gap-6"><a class="py-2 hover:text-[#c5fa67]" href="https://github.com/danillittle/bluntjira/blob/master/LICENSE">MIT License ↗</a><a class="py-2 hover:text-[#c5fa67]" href="https://www.npmjs.com/package/bluntjira">npm ↗</a><a class="py-2 hover:text-[#c5fa67]" href="https://github.com/danillittle/bluntjira">GitHub ↗</a></div>
+            </footer>
+        </div>
+    </body>
 </html>
